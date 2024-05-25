@@ -2,17 +2,19 @@
 
 #' Signal tables
 #'
-#' @description
+#' @description The `signal_table()` function modifies the `data.table` class to
+#'   work with electrical signal data. The input should be a data set of equal
+#'   number of rows. It will add a column of index positions called `sample` if
+#'   it does not already exist.
 #'
-#' `signal_table()` modifies the `data.table` class to work with electrical
-#' signal data. The input should be a data set of equal number of rows. It will
-#' add a column of index positions called `sample` if it does not already exist.
+#' @returns An object of class `signal_table`, which is an extension of the
+#'   `data.table` class. The `sample` column is *invariant* and will always be
+#'   present. The other columns represent additional channels.
 #'
-#' @param x `data.frame` A data frame
+#' @param x `data.frame` A data frame of signal data
 #'
 #' @param ... A `list` of equal lengths
 #'
-#' @import data.table
 #' @export
 signal_table <- function(...) {
 
@@ -126,19 +128,18 @@ vec_cast.signal_table.data.frame <- function(x, to, ...) {
 
 #' Annotation Table
 #'
-#' @description
-#' `annotation_table()` modifies the `<data.table>` class to work with
-#' annotation data. The columns are of all equal length, and each row describes
-#' a single annotation (although there may be duplicate time points).
+#' @description `annotation_table()` modifies the `data.table` class to work
+#' with annotation data. The columns are of all equal length, and each row
+#' describes a single annotation (although there may be duplicate time points).
 #'
-#' @details
-#' The `annotation_table()` function creates a compatible table that can be used
-#' with [write_annotation()] and [read_annotation()] functions.
+#' @details The `annotation_table()` function creates a compatible table that
+#' can be used with [write_annotation()] and [read_annotation()] functions.
 #'
 #' @inheritSection wfdb_annotations Annotation files
 #'
-#' @returns A `<data.table>` that has invariant columns that are compatible with
-#'   the WFDB library
+#' @returns A `data.table` that has invariant columns that are compatible with
+#'   the WFDB library. The key columns include the sample index, the type of
+#'   annotation (and its subtype and number qualifier), and the channel.
 #'
 #' @inheritParams wfdb
 #'
@@ -149,7 +150,8 @@ vec_cast.signal_table.data.frame <- function(x, to, ...) {
 #' @param time A `character` time stamp of the annotation, written in the format
 #'   of __HH:MM:SS.SSS__, starting at __00:00:00.000__. This is converted to the
 #'   appropriate time based on the header file (which records the actual start
-#'   time and sampling frequency).
+#'   time and sampling frequency). This is often a missing variable and is
+#'   given for compatibility with the WFDB applications.
 #'
 #' @param sample An `integer` representing the sample number of the annotation
 #'
@@ -158,20 +160,24 @@ vec_cast.signal_table.data.frame <- function(x, to, ...) {
 #' @param subtype A `character` or string representing the subtype of the
 #'   annotation
 #'
-#' @param channel An `integer` representing the channel number of the annotation
+#' @param channel An `integer` representing the channel number of the
+#'   annotation, or a `character` representing the channel name
 #'
 #' @param number An additional `integer` value or number that classifies the
 #'   annotation (allows for compatibility with multiple annotation types)
+#'
+#' @param frequency An `integer` that represents the sampling frequency in Hertz
 #'
 #' @export
 annotation_table <- function(annotator = character(),
 														 time = character(),
 														 sample = integer(),
+														 frequency = integer(),
 														 type = character(),
 														 subtype = character(),
 														 channel = integer(),
 														 number = integer(),
-														 frequency = integer()) {
+														 ...) {
 
 
 	# Invariant rules:
@@ -192,7 +198,12 @@ annotation_table <- function(annotator = character(),
 	# Can recycle some elements of data before placing in list
 	# The minimum data point is the type of annotation
 	# Everything revolves around the annotation itself
-	n <- length(type)
+	n <- length(sample)
+
+	# Type data
+	if (length(type) == 0) {
+		type <- vector(mode = "character", length = n)
+	}
 
 	# Subtypes
 	if (length(subtype) == 0) {
@@ -213,17 +224,30 @@ annotation_table <- function(annotator = character(),
 
 	# Sample/time are more complicated
 	# Sample can be given, and if so, time can be imputed if frequency is known
-	# If time is given, sample can be imputed if frequency is known
 	if (length(time) == 0 & length(sample) > 0) {
 		if (length(frequency) == 0) {
 			stop("Frequency must be given to impute time from sample")
+		} else {
+			# These periods are the time points in seconds
+			timePoints <- sample / frequency
+
+			# Hours
+			hours <- floor(timePoints / 3600)
+
+			# Minutes
+			minutes <- floor((timePoints - (hours * 3600)) / 60)
+
+			# Seconds
+			seconds <- timePoints - (hours * 3600) - (minutes * 60)
+
+			# Convert to characters
+			hours <- ifelse(hours < 10, paste0("0", hours), hours)
+			minutes <- ifelse(minutes < 10, paste0("0", minutes), minutes)
+			seconds <- ifelse(seconds < 10, paste0("0", seconds), seconds)
+
+			time <- paste0(hours, ":", minutes, ":", seconds)
 		}
-
-		#time <- as.character(as.POSIXct(as.numeric(sample) / frequency, origin = "1970-01-01", tz = "UTC"))
 	}
-
-
-
 
 	x <- df_list(time = time,
 							 sample = sample,
@@ -242,7 +266,7 @@ new_annotation_table <- function(x = list(),
 	if (length(x) > 0) {
 		checkmate::assert_list(
 			x,
-			types = c("integer", "character")
+			types = c("numeric", "integer", "character")
 		)
 
 		checkmate::assert_names(
@@ -330,23 +354,25 @@ vec_cast.annotation_table.data.frame <- function(x, to, ...) {
 
 #' Header Table
 #'
-#' @description
-#' `header_table()` modifies the `data.table` class to work with header data.
-#' The header data is read in from a similar format as to that of WFDB files and
-#' should be compatible/interchangeable when writing out to disk. The details
-#' extensively cover the type of data that is input. Generally, this function is
-#' called by `read_*_header()` functions and will generally not be called by the
-#' end-user.
+#' @description `header_table()` modifies the `data.table` class to work with
+#' header data. The header data is read in from a similar format as to that of
+#' WFDB files and should be compatible/interchangeable when writing out to disk.
+#' The details extensively cover the type of data that is input. Generally, this
+#' function is called by `read_*_header()` functions and will generally not be
+#' called by the end-user.
 #'
-#' @details
+#'@details The `header_table` object is relatively complex in that it directly
+#'  deals with properties of the signal, and allows compatibility with WFDB
+#'  files and other raw header files for other signal objects. It can be written
+#'  out using [write_wfdb()].
 #'
-#' # Header file structure
+#'  # Header file structure
 #'
-#' There are three components to the header file
+#'  There are three components to the header file:
 #'
-#' 1. __Record line__ that contains the following information, in the order
-#' documented, however pieces may be missing based on different parameters. From
-#' left to right...
+#'  1. __Record line__ that contains the following information, in the order
+#'  documented, however pieces may be missing based on different parameters.
+#'  From left to right...
 #'
 #'		- Record name
 #'		- Number of signals: represents number of segments/channels
@@ -355,9 +381,9 @@ vec_cast.annotation_table.data.frame <- function(x, to, ...) {
 #'		- Time: in HH:MM:SS format (optional)
 #'		- Date: in DD/MM/YYYY (optional)
 #'
-#' 1. __Signal specification lines__ contains specifications for individual
-#' signals, and there must be as many signal lines as there are reported by the
-#' above record line. From left to right....
+#'  1. __Signal specification lines__ contains specifications for individual
+#'  signals, and there must be as many signal lines as there are reported by the
+#'  above record line. From left to right....
 #'
 #'		- File name: usually *.dat
 #'		- Format `integer`: represents storage type, e.g. 8-bit or 16-bit
@@ -371,9 +397,13 @@ vec_cast.annotation_table.data.frame <- function(x, to, ...) {
 #'		- Block size (optional)
 #'		- Description: text or label information (optional)
 #'
-#' 1. __Info strings__ are unstructured lines that contains information about
-#' the record. Usually are descriptive. Starts with initial '#' without
-#' preceding white space at beginning of line.
+#'  1. __Info strings__ are unstructured lines that contains information about
+#'  the record. Usually are descriptive. Starts with initial '#' without
+#'  preceding white space at beginning of line.
+#'
+#' @returns A `header_table` object that is an extension of the `data.table`
+#'   class. This contains an adaptation of the function arguments, allowing for
+#'   compatibility with the WFDB class.
 #'
 #' @param x A `data.table` object that serves as the header table
 #'
@@ -385,7 +415,9 @@ vec_cast.annotation_table.data.frame <- function(x, to, ...) {
 #'
 #' @param samples An `integer` for the number of samples
 #'
-#' @param start_time The `POSIXct` time of recording
+#' @param start_time The `POSIXct` time of recording, with miliseconds included.
+#'   For example, `strptime(start_time, "%Y-%m-%d %H:%M%:%OSn")` where as
+#'   described in [base::strptime()]
 #'
 #' @param ADC_saturation An `integer` representing ADC saturation
 #'
@@ -432,7 +464,7 @@ header_table <- function(record_name = character(), # Record line information
 												 number_of_channels = integer(),
 												 frequency = 250.0,
 												 samples = integer(),
-												 start_time = Sys.time(),
+												 start_time = strptime(Sys.time(), "%Y-%m-%d %H:%M:%OSn"),
 												 ADC_saturation = integer(),
 												 file_name = character(), # Signal specific information
 												 storage_format = 16L,
@@ -520,6 +552,7 @@ header_table <- function(record_name = character(), # Record line information
 		ADC_gain <- ADC_saturation / additional_gain
 	}
 
+	# TODO
 	# Option characteristics
 
 	# Signal specifications
@@ -545,6 +578,7 @@ header_table <- function(record_name = character(), # Record line information
 		"scale" = ifelse(length(scale) == 0, NA, scale)
 	)
 
+	# TODO
 	# Info strings
 
 
