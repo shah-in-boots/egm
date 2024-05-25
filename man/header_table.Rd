@@ -10,7 +10,7 @@ header_table(
   number_of_channels = integer(),
   frequency = 250,
   samples = integer(),
-  start_time = Sys.time(),
+  start_time = strptime(Sys.time(), "\%Y-\%m-\%d \%H:\%M:\%OSn"),
   ADC_saturation = integer(),
   file_name = character(),
   storage_format = 16L,
@@ -42,7 +42,9 @@ is_header_table(x)
 
 \item{samples}{An \code{integer} for the number of samples}
 
-\item{start_time}{The \code{POSIXct} time of recording}
+\item{start_time}{The \code{POSIXct} time of recording, with miliseconds included.
+For example, \code{strptime(start_time, "\%Y-\%m-\%d \%H:\%M\%:\%OSn")} where as
+described in \code{\link[base:strptime]{base::strptime()}}}
 
 \item{ADC_saturation}{An \code{integer} representing ADC saturation}
 
@@ -86,20 +88,31 @@ to the header file, usually containing information about the channels,
 
 \item{x}{A \code{data.table} object that serves as the header table}
 }
+\value{
+A \code{header_table} object that is an extension of the \code{data.table}
+class. This contains an adaptation of the function arguments, allowing for
+compatibility with the WFDB class.
+}
 \description{
-\code{header_table()} modifies the \code{data.table} class to work with header data.
-The header data is read in from a similar format as to that of WFDB files and
-should be compatible/interchangeable when writing out to disk. The details
-extensively cover the type of data that is input. Generally, this function is
-called by \verb{read_*_header()} functions and will generally not be called by the
-end-user.
+\code{header_table()} modifies the \code{data.table} class to work with
+header data. The header data is read in from a similar format as to that of
+WFDB files and should be compatible/interchangeable when writing out to disk.
+The details extensively cover the type of data that is input. Generally, this
+function is called by \verb{read_*_header()} functions and will generally not be
+called by the end-user.
+}
+\details{
+The \code{header_table} object is relatively complex in that it directly
+deals with properties of the signal, and allows compatibility with WFDB
+files and other raw header files for other signal objects. It can be written
+out using \code{\link[=write_wfdb]{write_wfdb()}}.
 }
 \section{Header file structure}{
-There are three components to the header file
+There are three components to the header file:
 \enumerate{
 \item \strong{Record line} that contains the following information, in the order
-documented, however pieces may be missing based on different parameters. From
-left to right...
+documented, however pieces may be missing based on different parameters.
+From left to right...
 \itemize{
 \item Record name
 \item Number of signals: represents number of segments/channels

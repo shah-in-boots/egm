@@ -1,9 +1,15 @@
 #' WFDB path utilities
 #'
-#' These functions are used to help find and locate commands from the
+#' @description These functions are used to help find and locate commands from the
 #' installation of WFDB. They are helpful in setting and getting path options
 #' and specific WFDB commands. They are primarily internal helper functions, but
 #' are documented for troubleshooting purposes.
+#'
+#' @returns These functions are helper functions to work with the user-installed
+#'   WFDB software. They do not always return an object, and are primarily used
+#'   for their side effects. They are primarily developer functions, but are
+#'   exposed to the user to help troubleshoot issues with their installation of
+#'   WFDB.
 #'
 #' @param .app The name of WFDB software command or application as a `character`
 #'
@@ -125,7 +131,7 @@ parse_date_and_time <- function(x) {
 	stopifnot('Requires `x` to be a `character`' = is.character(x))
 
 	# Time
-	# 	Assumes HH:MM:SS
+	# 	Assumes HH:MM:SS.SSS
 	tm <- stringr::str_extract(x, '\\d\\d:\\d\\d:\\d\\d')
 
 	# Dates are more varied
@@ -133,6 +139,6 @@ parse_date_and_time <- function(x) {
 	dt <- stringr::str_extract(x, '\\d+/\\d+/\\d+')
 
 	# Create date time
-	as.POSIXct(strptime(paste(tm[1], dt[1]), "%H:%M:%S %d/%m/%Y"))
+	as.POSIXct(strptime(paste(tm[1], dt[1]), "%H:%M:%OS %d/%m/%Y"))
 
 }

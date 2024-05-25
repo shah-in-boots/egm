@@ -12,3 +12,5 @@
 ^data-raw$
 ^sandbox\.R$
 ^vignettes/articles$
+^cran-comments\.md$
+^CRAN-SUBMISSION$
