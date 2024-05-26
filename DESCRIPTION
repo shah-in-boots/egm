@@ -40,6 +40,13 @@ Suggests:
     rmarkdown,
     testthat (>= 3.0.0),
     withr,
+    dplyr,
+    scales,
+    shiny,
+    shinyFiles,
+    shinyjqui,
+    shinyjs,
+    DT,
 Config/testthat/edition: 3
 URL: https://shah-in-boots.github.io/EGM/
 BugReports: https://github.com/shah-in-boots/EGM/issues
